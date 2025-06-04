@@ -1,0 +1,178 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cobrinha de Geleia</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #111; color: white; font-family: sans-serif; }
+    canvas { display: block; }
+    #overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-size: 2rem;
+      z-index: 10;
+    }
+    #score {
+      position: absolute;
+      top: 10px; left: 10px;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+<div id="overlay">
+  <h1>Cobrinha de Geleia</h1>
+  <p>Toque ou clique para começar</p>
+</div>
+<div id="score">Pontuação: 0</div>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let colors = ['#ff007f', '#ff7f00', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#8b00ff'];
+let snake = [], bots = [], foods = [];
+let maxLength = 100;
+let speed = 2;
+let mouse = { x: canvas.width / 2, y: canvas.height / 2 };
+let head = { x: canvas.width / 2, y: canvas.height / 2 };
+snake.push({ ...head });
+let score = 0;
+let gameOver = false;
+let started = false;
+const overlay = document.getElementById('overlay');
+const scoreDisplay = document.getElementById('score');
+
+function spawnFood() {
+  return {
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    color: colors[Math.floor(Math.random() * colors.length)]
+  };
+}
+
+function spawnBot() {
+  let x = Math.random() * canvas.width;
+  let y = Math.random() * canvas.height;
+  let dir = Math.random() * Math.PI * 2;
+  return {
+    body: Array.from({length: 50}, (_, i) => ({ x, y })),
+    angle: dir,
+    color: colors[Math.floor(Math.random() * colors.length)]
+  };
+}
+
+for (let i = 0; i < 10; i++) foods.push(spawnFood());
+for (let i = 0; i < 3; i++) bots.push(spawnBot());
+
+document.addEventListener('mousemove', e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+document.addEventListener('click', startGame);
+document.addEventListener('touchstart', startGame);
+
+function startGame() {
+  if (!started) {
+    started = true;
+    overlay.style.display = 'none';
+    draw();
+  }
+  if (gameOver) location.reload();
+}
+
+function draw() {
+  if (gameOver) return;
+
+  ctx.fillStyle = 'rgba(17, 17, 17, 0.25)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const dx = mouse.x - head.x;
+  const dy = mouse.y - head.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  if (dist > 1) {
+    head.x += (dx / dist) * speed;
+    head.y += (dy / dist) * speed;
+  }
+
+  if (head.x < 0 || head.x > canvas.width || head.y < 0 || head.y > canvas.height) {
+    endGame();
+  }
+
+  snake.push({ ...head });
+  if (snake.length > maxLength) snake.shift();
+
+  for (let i = 0; i < foods.length; i++) {
+    let food = foods[i];
+    ctx.beginPath();
+    ctx.fillStyle = food.color;
+    ctx.arc(food.x, food.y, 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    const fx = food.x - head.x;
+    const fy = food.y - head.y;
+    if (Math.sqrt(fx*fx + fy*fy) < 15) {
+      maxLength += 10;
+      score += 1;
+      foods[i] = spawnFood();
+      scoreDisplay.textContent = 'Pontuação: ' + score;
+    }
+  }
+
+  for (let i = 0; i < snake.length; i++) {
+    let seg = snake[i];
+    let radius = i / snake.length * 15 + 5;
+    ctx.beginPath();
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  bots.forEach(bot => {
+    let head = bot.body[bot.body.length - 1];
+    head.x += Math.cos(bot.angle) * 1.5;
+    head.y += Math.sin(bot.angle) * 1.5;
+
+    if (head.x < 0 || head.x > canvas.width || head.y < 0 || head.y > canvas.height) {
+      bot.angle += Math.PI;
+    }
+
+    bot.body.push({ x: head.x, y: head.y });
+    if (bot.body.length > 50) bot.body.shift();
+
+    bot.body.forEach((seg, i) => {
+      let radius = i / bot.body.length * 12 + 4;
+      ctx.beginPath();
+      ctx.fillStyle = bot.color;
+      ctx.arc(seg.x, seg.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+
+      const dx = seg.x - head.x;
+      const dy = seg.y - head.y;
+      if (Math.sqrt((seg.x - head.x) ** 2 + (seg.y - head.y) ** 2) < radius + 10) {
+        endGame();
+      }
+    });
+  });
+
+  requestAnimationFrame(draw);
+}
+
+function endGame() {
+  gameOver = true;
+  overlay.innerHTML = `<h1>Fim de Jogo</h1><p>Sua pontuação: ${score}</p><p>Clique para reiniciar</p>`;
+  overlay.style.display = 'flex';
+}
+</script>
+</body>
+</html>
